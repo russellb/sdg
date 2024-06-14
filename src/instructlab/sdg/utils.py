@@ -166,7 +166,7 @@ def openai_completion(
         completions.extend(response.choices)
 
     if return_text:
-        completions = [completion.text for completion in completions]
+        completions = [completion.message.content for completion in completions]
     if decoding_args.n > 1:
         # make a nested list, where each entry is consecutive decoding_args.n of original entries.
         completions = [
