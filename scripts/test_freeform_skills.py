@@ -24,9 +24,9 @@ router_model = models.data[1].id
 
 samples = [
     {
-        'seed_question': """Could you help me write a formal email to inquire about the progress of my internship application?""",
-        'task_description': 'Writing formal emails',
-        'seed_response': """Subject: Inquiry Regarding the Status of My Internship Application
+        "seed_question": """Could you help me write a formal email to inquire about the progress of my internship application?""",
+        "task_description": "Writing formal emails",
+        "seed_response": """Subject: Inquiry Regarding the Status of My Internship Application
 
 Dear [Recipient's Name],
 
@@ -44,7 +44,7 @@ Sincerely,
 
 [Your Full Name]
 
-[Your Contact Information]"""
+[Your Contact Information]""",
     }
 ]
 
