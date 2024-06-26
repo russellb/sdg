@@ -1,7 +1,12 @@
+# Standard
 import re
+
+# Third Party
+from datasets import Dataset
+
+# Local
 from .block import Block
 from .logger_config import setup_logger
-from datasets import Dataset
 
 logger = setup_logger(__name__)
 

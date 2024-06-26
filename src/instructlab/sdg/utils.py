@@ -35,6 +35,7 @@ MODEL_FAMILY_MAPPINGS = {
     "granite": "merlinite",
 }
 
+
 class GenerateException(Exception):
     """An exception raised during generate step."""
 
