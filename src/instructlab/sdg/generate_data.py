@@ -19,7 +19,7 @@ import openai
 # First Party
 # pylint: disable=ungrouped-imports
 from instructlab.sdg import SDG, utils
-from instructlab.sdg.default_flows import MMLUBenchFlow, SynthKnowledgeFlow
+from instructlab.sdg.default_flows import MMLUBenchFlow, SynthKnowledgeFlow, SimpleKnowledgeFlow
 from instructlab.sdg.pipeline import Pipeline
 
 _WORD_DENYLIST = [
@@ -62,11 +62,12 @@ def unescape(s):
     return bytes(s, "utf-8").decode("utf-8")
 
 
-def _gen_train_data(machine_instruction_data, output_file_train):
+def _gen_train_data(logger, machine_instruction_data, output_file_train):
     train_data = []
     for synth_example in machine_instruction_data:
-        user = synth_example["instruction"]
-        if len(synth_example["input"]) > 0:
+        logger.debug(synth_example)
+        user = synth_example.get("instruction", "")
+        if len(synth_example.get("input", "")) > 0:
             user += "\n" + synth_example["input"]
         train_data.append(
             {
@@ -107,6 +108,8 @@ def generate_data(
     tls_client_cert: Optional[str] = None,
     tls_client_key: Optional[str] = None,
     tls_client_passwd: Optional[str] = None,
+    # TODO need to update the CLI to specify which profile to use (simple or full at the moment)
+    profile: Optional[str] = "simple",
 ):
     seed_instruction_data = []
     generate_start = time.time()
@@ -147,25 +150,41 @@ def generate_data(
         http_client=httpx.Client(cert=cert, verify=verify),
     )
 
-    mmlu_flow = MMLUBenchFlow(client, model_name).get_flow()
-    # TODO -- llama-cpp doesn't support batching, we need to get a hint from the CLI
-    # about whether we can turn this on (whether vllm is used or not)
-    for i, _ in enumerate(mmlu_flow):
-        if "block_config" in mmlu_flow[i] and "batch_kwargs" in mmlu_flow[i]["block_config"]:
-            mmlu_flow[i]["block_config"]["batch_kwargs"]["batched"] = False
-            logger.debug(mmlu_flow[i])
-        else:
-            logger.debug("No batch_kwargs in mmlu_flow: %s" % mmlu_flow[i])
-    knowledge_flow = SynthKnowledgeFlow(client, model_name).get_flow()
-    for i, _ in enumerate(knowledge_flow):
-        if "block_config" in knowledge_flow[i] and "batch_kwargs" in knowledge_flow[i]["block_config"]:
-            knowledge_flow[i]["block_config"]["batch_kwargs"]["batched"] = False
-            logger.debug(knowledge_flow[i])
-        else:
-            logger.debug("No batch_kwargs in knowledge_flow: %s" % knowledge_flow[i])
-    knowledge_pipe = Pipeline(knowledge_flow)
-    mmlu_pipe = Pipeline(mmlu_flow)
-    sdg = SDG([mmlu_pipe, knowledge_pipe])
+    sdg = None
+    if profile == "full":
+        mmlu_flow = MMLUBenchFlow(client, model_name).get_flow()
+        # TODO -- llama-cpp doesn't support batching, we need to get a hint from the CLI
+        # about whether we can turn this on (whether vllm is used or not)
+        for i, _ in enumerate(mmlu_flow):
+            if "block_config" in mmlu_flow[i] and "batch_kwargs" in mmlu_flow[i]["block_config"]:
+                mmlu_flow[i]["block_config"]["batch_kwargs"]["batched"] = False
+                logger.debug(mmlu_flow[i])
+            else:
+                logger.debug("No batch_kwargs in mmlu_flow: %s" % mmlu_flow[i])
+        knowledge_flow = SynthKnowledgeFlow(client, model_name).get_flow()
+        for i, _ in enumerate(knowledge_flow):
+            if "block_config" in knowledge_flow[i] and "batch_kwargs" in knowledge_flow[i]["block_config"]:
+                knowledge_flow[i]["block_config"]["batch_kwargs"]["batched"] = False
+                logger.debug(knowledge_flow[i])
+            else:
+                logger.debug("No batch_kwargs in knowledge_flow: %s" % knowledge_flow[i])
+        knowledge_pipe = Pipeline(knowledge_flow)
+        mmlu_pipe = Pipeline(mmlu_flow)
+        sdg = SDG([mmlu_pipe, knowledge_pipe])
+    elif profile == "simple":
+        knowledge_flow = SimpleKnowledgeFlow(client, model_name).get_flow()
+        # TODO -- llama-cpp doesn't support batching, we need to get a hint from the CLI
+        # about whether we can turn this on (whether vllm is used or not)
+        for i, _ in enumerate(knowledge_flow):
+            if "block_config" in knowledge_flow[i] and "batch_kwargs" in knowledge_flow[i]["block_config"]:
+                knowledge_flow[i]["block_config"]["batch_kwargs"]["batched"] = False
+                logger.debug(knowledge_flow[i])
+            else:
+                logger.debug("No batch_kwargs in knowledge_flow: %s" % knowledge_flow[i])
+            knowledge_flow[i]["block_config"]["logger"] = logger
+        sdg = SDG([Pipeline(knowledge_flow)])
+    else:
+        raise SystemExit(f"Error: profile ({profile}) is not supported.")
 
     if console_output:
         logger.info(
@@ -216,10 +235,14 @@ def generate_data(
                 chunk_word_count=chunk_word_count,
             )[0]
 
+        # TODO -- there is a parameter for how many samples to generate, but we ignore it so far
+
         ds = Dataset.from_list(samples)
         generated_data = sdg.generate(ds)
         logger.info("Generated %d samples" % len(generated_data))
         logger.debug("Generated data: %s" % generated_data)
+
+        _gen_train_data(logger, generated_data, os.path.join(output_dir, output_file))
 
     generate_duration = time.time() - generate_start
     logger.info(f"Generation took {generate_duration:.2f}s")

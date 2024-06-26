@@ -21,6 +21,7 @@ class LLMBlock(Block):
         model_id,
         output_cols,
         model_prompt="{prompt}",
+        logger=None,
         **batch_kwargs,
     ) -> None:
         super().__init__(block_name)
@@ -39,17 +40,25 @@ class LLMBlock(Block):
             "temperature": 0,
             "max_tokens": 12000,
         }
+        self.logger = logger
+
+    def _debug(self, msg):
+        print("DEBUG: ", msg)
+        if self.logger:
+            self.logger.debug(msg)
+        else:
+            print("NO LOGGER?")
 
     def _parse(self, generated_string) -> dict:
         matches = {}
         for start_tag, end_tag, output_col in zip(
-            self.block_config["start_tags"],
-            self.block_config["end_tags"],
+            self.block_config.get("start_tags", []),
+            self.block_config.get("end_tags", []),
             self.output_cols,
         ):
             if not start_tag and not end_tag:
                 matches[output_col] = (
-                    generated_string.strip() if generated_string else None
+                    [generated_string.strip() if generated_string else None]
                 )
             else:
                 pattern = re.escape(start_tag) + r"(.*?)" + re.escape(end_tag)
@@ -57,7 +66,7 @@ class LLMBlock(Block):
                 matches[output_col] = (
                     [match.strip() for match in all_matches] if all_matches else None
                 )
-
+        self._debug("_parse() matches: {}".format(matches))
         return matches
 
     def _generate(self, samples, **gen_kwargs) -> list:
@@ -81,6 +90,7 @@ class LLMBlock(Block):
         """
         num_samples = self.batch_params.get("num_samples", None)
         batched = self.batch_params.get("batched", False)
+        self._debug("Generating outputs for {} samples".format(len(samples)))
 
         if (num_samples is not None) and ("num_samples" not in samples.column_names):
             samples = samples.add_column("num_samples", [num_samples] * len(samples))
@@ -96,6 +106,7 @@ class LLMBlock(Block):
             outputs = self._generate(samples, **gen_kwargs)
         else:
             outputs = [self._generate([sample], **gen_kwargs)[0] for sample in samples]
+        self._debug("Generated outputs: {}".format(outputs))
 
         new_data = []
         for sample, output in zip(samples, outputs):
