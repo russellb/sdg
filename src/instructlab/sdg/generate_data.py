@@ -148,7 +148,15 @@ def generate_data(
     )
 
     mmlu_flow = MMLUBenchFlow(client, model_name).get_flow()
+    # TODO -- llama-cpp doesn't support batching, we need to get a hint from the CLI
+    # about whether we can turn this on (whether vllm is used or not)
+    for i in enumerate(mmlu_flow):
+        if "batch_kwargs" in mmlu_flow[i]:
+            mmlu_flow[i]["batch_kwargs"]["batched"] = False
     knowledge_flow = SynthKnowledgeFlow(client, model_name).get_flow()
+    for i in enumerate(knowledge_flow):
+        if "batch_kwargs" in knowledge_flow[i]:
+            knowledge_flow[i]["batch_kwargs"]["batched"] = False
     knowledge_pipe = Pipeline(knowledge_flow)
     mmlu_pipe = Pipeline(mmlu_flow)
     sdg = SDG([mmlu_pipe, knowledge_pipe])
