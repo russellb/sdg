@@ -29,7 +29,6 @@ from instructlab.sdg.utils.taxonomy import (
     leaf_node_to_samples,
     read_taxonomy_leaf_nodes,
 )
-import instructlab.sdg.utils.json as json_utils
 
 
 def _unescape(s):
