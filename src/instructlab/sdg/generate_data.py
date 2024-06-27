@@ -183,9 +183,14 @@ def generate_data(
             "Synthesizing new instructions. If you aren't satisfied with the generated instructions, interrupt training (Ctrl-C) and try adjusting your YAML files. Adding more examples may help."
         )
 
-    generated_data = None
+    generated_data = []
     for leaf_node in leaf_nodes.values():
         samples = leaf_node_to_samples(leaf_node)
+
+        if not samples:
+            # TODO - expected in e2e tests since we haven't integrated skills yet
+            logger.error("No samples found in leaf node")
+            continue
 
         # TODO this is broken, just trying to get initial integration to run
         # pylint: disable=consider-using-enumerate
