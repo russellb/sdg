@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 import json
 import os
-import re
 import time
 
 # Third Party
@@ -18,7 +17,7 @@ import openai
 
 # First Party
 # pylint: disable=ungrouped-imports
-from instructlab.sdg import SDG
+from instructlab.sdg import SDG, utils
 from instructlab.sdg.default_flows import (
     MMLUBenchFlow,
     SimpleKnowledgeFlow,
@@ -26,7 +25,10 @@ from instructlab.sdg.default_flows import (
 )
 from instructlab.sdg.pipeline import Pipeline
 from instructlab.sdg.utils import chunking
-from instructlab.sdg.utils.taxonomy import leaf_node_to_samples, read_taxonomy_leaf_nodes
+from instructlab.sdg.utils.taxonomy import (
+    leaf_node_to_samples,
+    read_taxonomy_leaf_nodes,
+)
 
 
 def _unescape(s):
@@ -50,6 +52,34 @@ def _gen_train_data(logger, machine_instruction_data, output_file_train):
     # utils_json.jdump(train_data, output_file_train)
     with open(output_file_train, "w", encoding="utf-8") as outfile:
         for entry in train_data:
+            json.dump(entry, outfile, ensure_ascii=False)
+            outfile.write("\n")
+
+
+def _gen_test_data(
+    leaf_nodes,
+    output_file_test,
+):
+    test_data = []
+    for _, leaf_node in leaf_nodes.items():
+        for seed_example in leaf_node:
+            user = seed_example["instruction"]  # question
+
+            if len(seed_example["input"]) > 0:
+                user += "\n" + seed_example["input"]  # context
+
+            test_data.append(
+                {
+                    "system": get_sysprompt(),
+                    "user": _unescape(user),
+                    "assistant": _unescape(seed_example["output"]),  # answer
+                }
+            )
+
+    # TODO - add this util helper
+    # utils.jdump(test_data, os.path.join(output_dir, output_file_test))
+    with open(output_file_test, "w", encoding="utf-8") as outfile:
+        for entry in test_data:
             json.dump(entry, outfile, ensure_ascii=False)
             outfile.write("\n")
 
@@ -101,13 +131,22 @@ def generate_data(
         os.mkdir(output_dir)
 
     if not (taxonomy and os.path.exists(taxonomy)):
-        raise SystemExit(f"Error: taxonomy ({taxonomy}) does not exist.")
+        raise utils.GenerateException(f"Error: taxonomy ({taxonomy}) does not exist.")
 
     leaf_nodes = read_taxonomy_leaf_nodes(taxonomy, taxonomy_base, yaml_rules)
+    if not leaf_nodes:
+        raise utils.GenerateException("Error: No new leaf nodes found in the taxonomy.")
 
     name = Path(model_name).stem  # Just in case it is a file path
     date_suffix = datetime.now().replace(microsecond=0).isoformat().replace(":", "_")
     output_file = f"generated_{name}_{date_suffix}.json"
+    output_file_test = f"test_{name}_{date_suffix}.jsonl"
+
+    _gen_test_data(
+        leaf_nodes,
+        os.path.join(output_dir, output_file_test),
+    )
+
     logger.debug(f"Generating to: {os.path.join(output_dir, output_file)}")
 
     orig_cert = (tls_client_cert, tls_client_key, tls_client_passwd)
