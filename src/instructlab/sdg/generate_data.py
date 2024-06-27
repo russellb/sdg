@@ -25,8 +25,8 @@ from instructlab.sdg.default_flows import (
     SynthKnowledgeFlow,
 )
 from instructlab.sdg.pipeline import Pipeline
-from instructlab.sdg.taxonomy import leaf_node_to_samples, read_taxonomy_leaf_nodes
 from instructlab.sdg.utils import chunking
+from instructlab.sdg.utils.taxonomy import leaf_node_to_samples, read_taxonomy_leaf_nodes
 
 
 def _unescape(s):
