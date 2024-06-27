@@ -19,12 +19,14 @@ import openai
 # pylint: disable=ungrouped-imports
 from instructlab.sdg import SDG, utils
 from instructlab.sdg.default_flows import (
+    MODEL_FAMILY_MERLINITE,
+    MODEL_FAMILY_MIXTRAL,
     MMLUBenchFlow,
     SimpleKnowledgeFlow,
     SynthKnowledgeFlow,
 )
 from instructlab.sdg.pipeline import Pipeline
-from instructlab.sdg.utils import chunking
+from instructlab.sdg.utils import chunking, models
 from instructlab.sdg.utils.taxonomy import (
     leaf_node_to_samples,
     read_taxonomy_leaf_nodes,
@@ -88,8 +90,6 @@ def generate_data(
     logger,
     api_base,
     tls_insecure,
-    # TODO - not yet used. Right now the lib will guess based on the model name
-    # but we should pass this along if specified
     model_family: str,
     yaml_rules: Optional[str] = None,
     output_dir: Optional[str] = None,
@@ -157,6 +157,10 @@ def generate_data(
         http_client=httpx.Client(cert=cert, verify=verify),
     )
 
+    model_family = MODEL_FAMILY_MERLINITE
+    if models.get_model_family(model_family, model_name) == "mixtral":
+        model_family = MODEL_FAMILY_MIXTRAL
+
     # TODO -- llama-cpp doesn't support batching, we need to get a hint from the CLI
     # about whether we can turn this on (whether vllm is used or not)
     batched = False
@@ -172,7 +176,7 @@ def generate_data(
 
     sdg = SDG(
         [
-            Pipeline(flow_type(client, model_name, batched).get_flow())
+            Pipeline(flow_type(client, model_family, model_name, batched).get_flow())
             for flow_type in flow_types
         ]
     )
