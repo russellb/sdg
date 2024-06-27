@@ -29,6 +29,7 @@ from instructlab.sdg.utils.taxonomy import (
     leaf_node_to_samples,
     read_taxonomy_leaf_nodes,
 )
+import instructlab.sdg.utils.json as json_utils
 
 
 def _unescape(s):
@@ -49,7 +50,7 @@ def _gen_train_data(logger, machine_instruction_data, output_file_train):
                 "assistant": _unescape(synth_example["output"]),
             }
         )
-    # utils_json.jdump(train_data, output_file_train)
+
     with open(output_file_train, "w", encoding="utf-8") as outfile:
         for entry in train_data:
             json.dump(entry, outfile, ensure_ascii=False)
@@ -76,8 +77,6 @@ def _gen_test_data(
                 }
             )
 
-    # TODO - add this util helper
-    # utils.jdump(test_data, os.path.join(output_dir, output_file_test))
     with open(output_file_test, "w", encoding="utf-8") as outfile:
         for entry in test_data:
             json.dump(entry, outfile, ensure_ascii=False)
@@ -139,15 +138,16 @@ def generate_data(
 
     name = Path(model_name).stem  # Just in case it is a file path
     date_suffix = datetime.now().replace(microsecond=0).isoformat().replace(":", "_")
-    output_file = f"generated_{name}_{date_suffix}.json"
+    output_file_generated = f"generated_{name}_{date_suffix}.json"
     output_file_test = f"test_{name}_{date_suffix}.jsonl"
+    output_file_train = f"train_{name}_{date_suffix}.jsonl"
 
     _gen_test_data(
         leaf_nodes,
         os.path.join(output_dir, output_file_test),
     )
 
-    logger.debug(f"Generating to: {os.path.join(output_dir, output_file)}")
+    logger.debug(f"Generating to: {os.path.join(output_dir, output_file_generated)}")
 
     orig_cert = (tls_client_cert, tls_client_key, tls_client_passwd)
     cert = tuple(item for item in orig_cert if item)
@@ -183,6 +183,7 @@ def generate_data(
             "Synthesizing new instructions. If you aren't satisfied with the generated instructions, interrupt training (Ctrl-C) and try adjusting your YAML files. Adding more examples may help."
         )
 
+    generated_data = None
     for leaf_node in leaf_nodes.values():
         samples = leaf_node_to_samples(leaf_node)
 
@@ -198,11 +199,27 @@ def generate_data(
         # TODO -- there is a parameter for how many samples to generate, but we ignore it so far
 
         ds = Dataset.from_list(samples)
-        generated_data = sdg.generate(ds)
+        new_generated_data = sdg.generate(ds)
+        generated_data = (
+            new_generated_data
+            if generated_data is None
+            else generated_data + new_generated_data
+        )
         logger.info("Generated %d samples" % len(generated_data))
         logger.debug("Generated data: %s" % generated_data)
 
-        _gen_train_data(logger, generated_data, os.path.join(output_dir, output_file))
+    _gen_train_data(
+        logger, generated_data, os.path.join(output_dir, output_file_train)
+    )
+
+    # TODO
+    # This is for backwards compatibility. The file existing previously, so we'll keep it for now.
+    # I believe the github bot assumes it is present for presenting generated data to a taxonomy
+    # reviewer or contributor. Otherwise, I don't see a consumer of it in this repo or the
+    # `ilab` CLI.
+    _gen_train_data(
+        logger, generated_data, os.path.join(output_dir, output_file_generated)
+    )
 
     generate_duration = time.time() - generate_start
     logger.info(f"Generation took {generate_duration:.2f}s")
