@@ -182,7 +182,7 @@ def generate_data(
             "Synthesizing new instructions. If you aren't satisfied with the generated instructions, interrupt training (Ctrl-C) and try adjusting your YAML files. Adding more examples may help."
         )
 
-    generated_data = []
+    generated_data = None
     for leaf_node in leaf_nodes.values():
         samples = leaf_node_to_samples(leaf_node)
 
@@ -211,6 +211,9 @@ def generate_data(
         )
         logger.info("Generated %d samples" % len(generated_data))
         logger.debug("Generated data: %s" % generated_data)
+
+    if generated_data is None:
+        generated_data = []
 
     _gen_train_data(logger, generated_data, os.path.join(output_dir, output_file_train))
 
