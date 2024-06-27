@@ -212,9 +212,7 @@ def generate_data(
         logger.info("Generated %d samples" % len(generated_data))
         logger.debug("Generated data: %s" % generated_data)
 
-    _gen_train_data(
-        logger, generated_data, os.path.join(output_dir, output_file_train)
-    )
+    _gen_train_data(logger, generated_data, os.path.join(output_dir, output_file_train))
 
     # TODO
     # This is for backwards compatibility. The file existing previously, so we'll keep it for now.
