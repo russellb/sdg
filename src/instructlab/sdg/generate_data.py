@@ -193,9 +193,10 @@ def generate_data(
         http_client=httpx.Client(cert=cert, verify=verify),
     )
 
-    model_family = MODEL_FAMILY_MERLINITE
     if models.get_model_family(model_family, model_name) == "mixtral":
         model_family = MODEL_FAMILY_MIXTRAL
+    else:
+        model_family = MODEL_FAMILY_MERLINITE
 
     # TODO -- llama-cpp doesn't support batching, we need to get a hint from the CLI
     # about whether we can turn this on (whether vllm is used or not)
