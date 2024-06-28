@@ -421,13 +421,15 @@ def leaf_node_to_samples(leaf_node):
     # pylint: disable=consider-using-enumerate
     for i in range(len(leaf_node)):
         samples[-1].setdefault("task_description", leaf_node[i]["task_description"])
-        for field in ["context", "document", "domain"]:
-            if field in leaf_node[i]:
+        for field in ["document", "domain"]:
+            if leaf_node[i].get(field):
                 samples[-1].setdefault(field, leaf_node[i][field])
         if samples[-1].get("document") and not samples[-1].get("domain"):
             raise utils.GenerateException(
                 "Error: No domain provided for knowledge document in leaf node"
             )
+        if leaf_node[i].get("input"):
+            samples[-1].setdefault("context", leaf_node[i]["input"])
         if "question_3" in samples[-1]:
             samples.append({})
         if "question_1" not in samples[-1]:

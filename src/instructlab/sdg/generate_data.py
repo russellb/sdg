@@ -22,6 +22,8 @@ from instructlab.sdg.default_flows import (
     MODEL_FAMILY_MERLINITE,
     MODEL_FAMILY_MIXTRAL,
     MMLUBenchFlow,
+    SimpleFreeformSkillFlow,
+    SimpleGroundedSkillFlow,
     SimpleKnowledgeFlow,
     SynthKnowledgeFlow,
 )
@@ -120,6 +122,41 @@ def _gen_test_data(
             outfile.write("\n")
 
 
+def _sdg_init(profile, client, model_family, model_name, batched):
+    knowledge_flow_types = []
+    freeform_skill_flow_types = []
+    grounded_skill_flow_types = []
+    if profile == "full":
+        knowledge_flow_types.append(MMLUBenchFlow)
+        knowledge_flow_types.append(SynthKnowledgeFlow)
+    elif profile == "simple":
+        knowledge_flow_types.append(SimpleKnowledgeFlow)
+        freeform_skill_flow_types.append(SimpleFreeformSkillFlow)
+        grounded_skill_flow_types.append(SimpleGroundedSkillFlow)
+    else:
+        raise utils.GenerateException(f"Error: profile ({profile}) is not supported.")
+
+    sdg_knowledge = SDG(
+        [
+            Pipeline(flow_type(client, model_family, model_name, batched).get_flow())
+            for flow_type in knowledge_flow_types
+        ]
+    )
+    sdg_freeform_skill = SDG(
+        [
+            Pipeline(flow_type(client, model_family, model_name, batched).get_flow())
+            for flow_type in freeform_skill_flow_types
+        ]
+    )
+    sdg_grounded_skill = SDG(
+        [
+            Pipeline(flow_type(client, model_family, model_name, batched).get_flow())
+            for flow_type in grounded_skill_flow_types
+        ]
+    )
+    return sdg_knowledge, sdg_freeform_skill, sdg_grounded_skill
+
+
 # TODO - parameter removal needs to be done in sync with a CLI change.
 # pylint: disable=unused-argument
 def generate_data(
@@ -201,20 +238,8 @@ def generate_data(
     # about whether we can turn this on (whether vllm is used or not)
     batched = False
 
-    knowledge_flow_types = []
-    if profile == "full":
-        knowledge_flow_types.append(MMLUBenchFlow)
-        knowledge_flow_types.append(SynthKnowledgeFlow)
-    elif profile == "simple":
-        knowledge_flow_types.append(SimpleKnowledgeFlow)
-    else:
-        raise SystemExit(f"Error: profile ({profile}) is not supported.")
-
-    sdg_knowledge = SDG(
-        [
-            Pipeline(flow_type(client, model_family, model_name, batched).get_flow())
-            for flow_type in knowledge_flow_types
-        ]
+    sdg_knowledge, sdg_freeform_skill, sdg_grounded_skill = _sdg_init(
+        profile, client, model_family, model_name, batched
     )
 
     if console_output:
@@ -227,30 +252,39 @@ def generate_data(
         samples = leaf_node_to_samples(leaf_node)
 
         if not samples:
-            # TODO - expected in e2e tests since we haven't integrated skills yet
-            logger.error("No samples found in leaf node")
-            continue
+            logger.d
+            raise utils.GenerateException("Error: No samples found in leaf node.")
 
         sdg = None
         if samples[0].get("document"):
             sdg = sdg_knowledge
+        elif samples[0].get("context"):
+            sdg = sdg_grounded_skill
         else:
+            sdg = sdg_freeform_skill
+
+        if not sdg:
+            # TODO - can be removed once the "full" pipelines are all defined,
+            # as there shouldn't be a code path to get here anymore
             raise utils.GenerateException(
                 "Error: No SDG pipeline for this leaf node type: %s" % samples[0]
             )
 
         # TODO this is broken, just trying to get initial integration to run
         # pylint: disable=consider-using-enumerate
-        for i in range(len(samples)):
-            samples[i]["document"] = chunking.chunk_document(
-                documents=samples[i]["document"],
-                server_ctx_size=server_ctx_size,
-                chunk_word_count=chunk_word_count,
-            )[0]
+        if samples[0].get("document"):
+            for i in range(len(samples)):
+                samples[i]["document"] = chunking.chunk_document(
+                    documents=samples[i]["document"],
+                    server_ctx_size=server_ctx_size,
+                    chunk_word_count=chunk_word_count,
+                )[0]
 
         # TODO -- there is a parameter for how many samples to generate, but we ignore it so far
 
+        logger.debug("Samples: %s" % samples)
         ds = Dataset.from_list(samples)
+        logger.debug("Dataset: %s" % ds)
         new_generated_data = sdg.generate(ds)
         generated_data = (
             new_generated_data
