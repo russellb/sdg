@@ -201,19 +201,19 @@ def generate_data(
     # about whether we can turn this on (whether vllm is used or not)
     batched = False
 
-    flow_types = []
+    knowledge_flow_types = []
     if profile == "full":
-        flow_types.append(MMLUBenchFlow)
-        flow_types.append(SynthKnowledgeFlow)
+        knowledge_flow_types.append(MMLUBenchFlow)
+        knowledge_flow_types.append(SynthKnowledgeFlow)
     elif profile == "simple":
-        flow_types.append(SimpleKnowledgeFlow)
+        knowledge_flow_types.append(SimpleKnowledgeFlow)
     else:
         raise SystemExit(f"Error: profile ({profile}) is not supported.")
 
-    sdg = SDG(
+    sdg_knowledge = SDG(
         [
             Pipeline(flow_type(client, model_family, model_name, batched).get_flow())
-            for flow_type in flow_types
+            for flow_type in knowledge_flow_types
         ]
     )
 
@@ -230,6 +230,14 @@ def generate_data(
             # TODO - expected in e2e tests since we haven't integrated skills yet
             logger.error("No samples found in leaf node")
             continue
+
+        sdg = None
+        if samples[0].get("document"):
+            sdg = sdg_knowledge
+        else:
+            raise utils.GenerateException(
+                "Error: No SDG pipeline for this leaf node type: %s" % samples[0]
+            )
 
         # TODO this is broken, just trying to get initial integration to run
         # pylint: disable=consider-using-enumerate

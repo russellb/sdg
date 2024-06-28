@@ -17,6 +17,9 @@ import git
 import gitdb
 import yaml
 
+# First Party
+from instructlab.sdg import utils
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_YAML_RULES = """\
@@ -331,6 +334,7 @@ def _read_taxonomy_file(file_path: str, yaml_rules: Optional[str] = None):
         # get seed instruction data
         tax_path = "->".join(taxonomy_path.parent.parts)
         task_description = contents.get("task_description")
+        domain = contents.get("domain")
         documents = contents.get("document")
         if documents:
             documents = _get_documents(source=documents)
@@ -348,6 +352,7 @@ def _read_taxonomy_file(file_path: str, yaml_rules: Optional[str] = None):
                     "taxonomy_path": tax_path,
                     "task_description": task_description,
                     "document": documents,
+                    "domain": domain,
                 }
             )
     except Exception as e:
@@ -411,19 +416,18 @@ def read_taxonomy_leaf_nodes(taxonomy, taxonomy_base, yaml_rules):
 
 
 def leaf_node_to_samples(leaf_node):
-    # TODO -- only handles knowledge leaf nodes, need to add support for other types
-    if leaf_node[0].get("document") is None:
-        logger.error("Only knowledge leaf nodes supported at the moment")
-        return None
-
     samples = [{}]
 
     # pylint: disable=consider-using-enumerate
     for i in range(len(leaf_node)):
         samples[-1].setdefault("task_description", leaf_node[i]["task_description"])
-        samples[-1].setdefault("document", leaf_node[i]["document"])
-        # TODO - fix read_taxonomy() to return the domain. It's not included right now.
-        samples[-1].setdefault("domain", leaf_node[i].get("domain", "general"))
+        for field in ["context", "document", "domain"]:
+            if field in leaf_node[i]:
+                samples[-1].setdefault(field, leaf_node[i][field])
+        if samples[-1].get("document") and not samples[-1].get("domain"):
+            raise utils.GenerateException(
+                "Error: No domain provided for knowledge document in leaf node"
+            )
         if "question_3" in samples[-1]:
             samples.append({})
         if "question_1" not in samples[-1]:
