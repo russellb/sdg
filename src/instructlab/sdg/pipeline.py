@@ -18,6 +18,13 @@ class Pipeline:
         # pipeline config is the run configuration that consists of the pipeline steps
         self.chained_blocks = chained_blocks
 
+    @classmethod
+    def from_flows(cls, flow_types, flow_params):
+        block_configs = []
+        for flow_type in flow_types:
+            block_configs.extend(flow_type(flow_params).render())
+        return cls(block_configs)
+
     def _drop_duplicates(self, dataset, cols):
         """
         Drop duplicates from the dataset based on the columns provided.

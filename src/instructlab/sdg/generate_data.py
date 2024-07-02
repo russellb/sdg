@@ -140,17 +140,11 @@ def _sdg_init(pipeline, client, model_family, model_name, num_iters, batched):
     else:
         raise utils.GenerateException(f"Error: pipeline ({pipeline}) is not supported.")
 
-    def build_pipeline(flow_types, flow_params):
-        block_configs = []
-        for flow_type in flow_types:
-            block_configs.extend(flow_type(flow_params).render())
-        return Pipeline(block_configs)
-
     flow_params = FlowParams(client, model_family, model_name, num_iters, batched)
 
-    knowledge_pipeline = build_pipeline(knowledge_flow_types, flow_params)
-    freeform_skill_pipeline = build_pipeline(freeform_skill_flow_types, flow_params)
-    grounded_skill_pipeline = build_pipeline(grounded_skill_flow_types, flow_params)
+    knowledge_pipeline = Pipeline.from_flows(knowledge_flow_types, flow_params)
+    freeform_skill_pipeline = Pipeline.from_flows(freeform_skill_flow_types, flow_params)
+    grounded_skill_pipeline = Pipeline.from_flows(grounded_skill_flow_types, flow_params)
 
     return SDG([knowledge_pipeline]), SDG([freeform_skill_pipeline]), SDG([grounded_skill_pipeline])
 
