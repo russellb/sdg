@@ -12,7 +12,7 @@ from .llmblock import LLMBlock
 from .utilblocks import CombineColumnsBlock
 
 
-class Flow(ABC):
+class FlowParams:
     def __init__(self, client, model_family, model_id, num_iters, batched=True) -> None:
         self.client = client
         self.model_family = model_family
@@ -21,30 +21,35 @@ class Flow(ABC):
         self.batched = batched
         self.sdg_base = resources.files(__package__)
 
+
+class Flow(ABC):
+    def __init__(self, params) -> None:
+         self.params = params
+
     @abstractmethod
-    def get_flow(self) -> list:
+    def render(self) -> list:
         pass
 
 
 class _SimpleFlow(Flow):
-    def get_flow(self) -> list:
+    def render(self) -> list:
         return [
             {
                 "block_type": IterBlock,
                 "block_config": {
                     "block_name": "",  # must be set by subclass
-                    "num_iters": self.num_iters,
+                    "num_iters": self.params.num_iters,
                     "block_type": LLMBlock,
                     "block_kwargs": {
                         "block_name": "",  # must be set by subclass
                         "config_path": "",  # must be set by subclass
-                        "client": self.client,
-                        "model_id": self.model_id,
-                        "model_family": self.model_family,
+                        "client": self.params.client,
+                        "model_id": self.params.model_id,
+                        "model_family": self.params.model_family,
                         "output_cols": ["output"],
                         "batch_kwargs": {
                             "num_procs": 8,
-                            "batched": self.batched,
+                            "batched": self.params.batched,
                         },
                     },
                     "gen_kwargs": {
@@ -58,10 +63,10 @@ class _SimpleFlow(Flow):
 
 
 class SimpleKnowledgeFlow(_SimpleFlow):
-    def get_flow(self) -> list:
-        flow = super().get_flow()
+    def render(self) -> list:
+        flow = super().render()
         flow[0]["block_config"]["block_kwargs"]["config_path"] = os.path.join(
-            self.sdg_base, "configs/knowledge/simple_generate_qa.yaml"
+            self.params.sdg_base, "configs/knowledge/simple_generate_qa.yaml"
         )
         flow[0]["block_config"]["block_kwargs"]["block_name"] = "gen_knowledge"
         flow[0]["block_config"]["block_name"] = "gen_knowledge"
@@ -69,10 +74,10 @@ class SimpleKnowledgeFlow(_SimpleFlow):
 
 
 class SimpleFreeformSkillFlow(_SimpleFlow):
-    def get_flow(self) -> list:
-        flow = super().get_flow()
+    def render(self) -> list:
+        flow = super().render()
         flow[0]["block_config"]["block_kwargs"]["config_path"] = os.path.join(
-            self.sdg_base, "configs/skills/simple_generate_qa_freeform.yaml"
+            self.params.sdg_base, "configs/skills/simple_generate_qa_freeform.yaml"
         )
         flow[0]["block_config"]["block_kwargs"]["block_name"] = "gen_skill_freeform"
         flow[0]["block_config"]["block_name"] = "gen_skill_freeform"
@@ -80,10 +85,10 @@ class SimpleFreeformSkillFlow(_SimpleFlow):
 
 
 class SimpleGroundedSkillFlow(_SimpleFlow):
-    def get_flow(self) -> list:
-        flow = super().get_flow()
+    def render(self) -> list:
+        flow = super().render()
         flow[0]["block_config"]["block_kwargs"]["config_path"] = os.path.join(
-            self.sdg_base, "configs/skills/simple_generate_qa_grounded.yaml"
+            self.params.sdg_base, "configs/skills/simple_generate_qa_grounded.yaml"
         )
         flow[0]["block_config"]["block_kwargs"]["block_name"] = "gen_skill_grounded"
         flow[0]["block_config"]["block_name"] = "gen_skill_grounded"
@@ -91,23 +96,22 @@ class SimpleGroundedSkillFlow(_SimpleFlow):
 
 
 class MMLUBenchFlow(Flow):
-    def get_flow(self) -> list:
-        self.sdg_base = resources.files(__package__)
+    def render(self) -> list:
         return [
             {
                 "block_type": LLMBlock,
                 "block_config": {
                     "block_name": "gen_mmlu_knowledge",
                     "config_path": os.path.join(
-                        self.sdg_base, "configs/knowledge/mcq_generation.yaml"
+                        self.params.sdg_base, "configs/knowledge/mcq_generation.yaml"
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["mmlubench_question", "mmlubench_answer"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
                 "gen_kwargs": {
@@ -120,23 +124,23 @@ class MMLUBenchFlow(Flow):
 
 
 class SynthKnowledgeFlow(Flow):
-    def get_flow(self) -> list:
+    def render(self) -> list:
         return [
             {
                 "block_type": LLMBlock,
                 "block_config": {
                     "block_name": "gen_knowledge",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/knowledge/generate_questions_responses.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["question", "response"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                     "parser_kwargs": {
                         "parser_name": "custom",
@@ -154,15 +158,15 @@ class SynthKnowledgeFlow(Flow):
                 "block_config": {
                     "block_name": "eval_faithfulness_qa_pair",
                     "config_path": os.path.join(
-                        self.sdg_base, "configs/knowledge/evaluate_faithfulness.yaml"
+                        self.params.sdg_base, "configs/knowledge/evaluate_faithfulness.yaml"
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["explanation", "judgment"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
                 "gen_kwargs": {
@@ -187,15 +191,15 @@ class SynthKnowledgeFlow(Flow):
                 "block_config": {
                     "block_name": "eval_relevancy_qa_pair",
                     "config_path": os.path.join(
-                        self.sdg_base, "configs/knowledge/evaluate_relevancy.yaml"
+                        self.params.sdg_base, "configs/knowledge/evaluate_relevancy.yaml"
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["feedback", "score"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
                 "gen_kwargs": {
@@ -221,15 +225,15 @@ class SynthKnowledgeFlow(Flow):
                 "block_config": {
                     "block_name": "eval_verify_question",
                     "config_path": os.path.join(
-                        self.sdg_base, "configs/knowledge/evaluate_question.yaml"
+                        self.params.sdg_base, "configs/knowledge/evaluate_question.yaml"
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["explanation", "rating"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
                 "gen_kwargs": {
@@ -254,24 +258,24 @@ class SynthKnowledgeFlow(Flow):
 
 
 class SynthSkillsFlow(Flow):
-    def get_flow(self) -> list:
+    def render(self) -> list:
         return [
             {
                 "block_type": LLMBlock,
                 "block_config": {
                     "block_name": "gen_questions",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/freeform_questions.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["question"],
                     "batch_kwargs": {
                         "num_procs": 8,
                         "num_samples": self.num_iters,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
                 "drop_duplicates": ["question"],
@@ -281,16 +285,16 @@ class SynthSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "eval_questions",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/evaluate_freeform_questions.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["evaluation", "score"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
             },
@@ -313,16 +317,16 @@ class SynthSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "gen_responses",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/freeform_responses.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["response"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
             },
@@ -331,16 +335,16 @@ class SynthSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "evaluate_qa_pair",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/evaluate_freeform_pair.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["evaluation", "score"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
             },
@@ -362,7 +366,7 @@ class SynthSkillsFlow(Flow):
 
 
 class SynthGroundedSkillsFlow(Flow):
-    def get_flow(self) -> list:
+    def render(self) -> list:
         return [
             {
                 "block_type": IterBlock,
@@ -373,16 +377,16 @@ class SynthGroundedSkillsFlow(Flow):
                     "block_kwargs": {
                         "block_name": "gen_contexts",
                         "config_path": os.path.join(
-                            self.sdg_base,
+                            self.params.sdg_base,
                             "configs/skills/contexts.yaml",
                         ),
-                        "client": self.client,
-                        "model_id": self.model_id,
-                        "model_family": self.model_family,
+                        "client": self.params.client,
+                        "model_id": self.params.model_id,
+                        "model_family": self.params.model_family,
                         "output_cols": ["context"],
                         "batch_kwargs": {
                             "num_procs": 8,
-                            "batched": self.batched,
+                            "batched": self.params.batched,
                         },
                     },
                     "gen_kwargs": {
@@ -396,16 +400,16 @@ class SynthGroundedSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "gen_grounded_questions",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/grounded_questions.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["question"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
                 "drop_duplicates": ["question"],
@@ -415,12 +419,12 @@ class SynthGroundedSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "eval_grounded_questions",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/evaluate_grounded_questions.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["evaluation", "score"],
                     "batch_kwargs": {
                         "num_procs": 8,
@@ -448,16 +452,16 @@ class SynthGroundedSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "gen_grounded_responses",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/grounded_responses.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["response"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
             },
@@ -466,16 +470,16 @@ class SynthGroundedSkillsFlow(Flow):
                 "block_config": {
                     "block_name": "evaluate_grounded_qa_pair",
                     "config_path": os.path.join(
-                        self.sdg_base,
+                        self.params.sdg_base,
                         "configs/skills/evaluate_grounded_pair.yaml",
                     ),
-                    "client": self.client,
-                    "model_id": self.model_id,
-                    "model_family": self.model_family,
+                    "client": self.params.client,
+                    "model_id": self.params.model_id,
+                    "model_family": self.params.model_family,
                     "output_cols": ["evaluation", "score"],
                     "batch_kwargs": {
                         "num_procs": 8,
-                        "batched": self.batched,
+                        "batched": self.params.batched,
                     },
                 },
             },
