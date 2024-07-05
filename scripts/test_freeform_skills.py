@@ -4,8 +4,8 @@ from openai import OpenAI
 
 # First Party
 from src.instructlab.sdg import SDG
-from src.instructlab.sdg.default_flows import FlowParams, SynthSkillsFlow
-from src.instructlab.sdg.pipeline import Pipeline
+from src.instructlab.sdg.default_flows import SynthSkillsFlow
+from src.instructlab.sdg.pipeline import Pipeline, PipelineContext
 
 # for vLLM endpoints, the api_key remains "EMPTY"
 openai_api_key = "EMPTY"
@@ -49,10 +49,10 @@ Sincerely,
 
 ds = Dataset.from_list(samples)
 
-flow_params = FlowParams(client, "mixtral", teacher_model, 1)
+ctx = PipelineContext(client, "mixtral", teacher_model, 1)
 
-skills_block_configs = SynthSkillsFlow(flow_params).render()
-skills_pipe = Pipeline(skills_block_configs)
+skills_block_configs = SynthSkillsFlow().render()
+skills_pipe = Pipeline(ctx, skills_block_configs)
 
 sdg = SDG([skills_pipe])
 gen_data = sdg.generate(ds)

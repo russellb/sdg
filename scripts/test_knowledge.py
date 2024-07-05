@@ -7,8 +7,8 @@ from openai import OpenAI
 
 # First Party
 from src.instructlab.sdg import SDG
-from src.instructlab.sdg.default_flows import FlowParams, MMLUBenchFlow, SynthKnowledgeFlow
-from src.instructlab.sdg.pipeline import Pipeline
+from src.instructlab.sdg.default_flows import MMLUBenchFlow, SynthKnowledgeFlow
+from src.instructlab.sdg.pipeline import Pipeline, PipelineContext
 
 # Please don't add you vLLM endpoint key here
 openai_api_key = "EMPTY"
@@ -38,13 +38,13 @@ samples = [
 
 ds = Dataset.from_list(samples)
 
-flow_params = FlowParams(client, "mixtral", teacher_model, 1)
+ctx = PipelineContext(client, "mixtral", teacher_model, 1)
 
-mmlu_block_configs = MMLUBenchFlow(flow_params).render()
-knowledge_block_configs = SynthKnowledgeFlow(flow_params).render()
-knowledge_pipe = Pipeline(mmlu_flow + knowledge_flow)
+mmlu_block_configs = MMLUBenchFlow().render()
+knowledge_block_configs = SynthKnowledgeFlow().render()
+knowledge_pipe = Pipeline(ctx, mmlu_flow + knowledge_flow)
 
-sdg = SDG([knowledge_pipe]))
+sdg = SDG([knowledge_pipe])
 mmlubench_data = sdg.generate(ds)
 
 print(mmlubench_data)

@@ -11,14 +11,13 @@ logger = setup_logger(__name__)
 
 class FilterByValueBlock(Block):
     def __init__(
-        self, filter_column, filter_value, operation, convert_dtype=None, **batch_kwargs
+        self, ctx, filter_column, filter_value, operation, convert_dtype=None
     ) -> None:
-        super().__init__(block_name=self.__class__.__name__)
+        super().__init__(ctx, block_name=self.__class__.__name__)
         self.value = filter_value
         self.column_name = filter_column
         self.operation = operation
         self.convert_dtype = convert_dtype
-        self.num_procs = batch_kwargs.get("num_procs", 1)
 
     def _convert_dtype(self, sample):
         try:
@@ -33,11 +32,14 @@ class FilterByValueBlock(Block):
     def generate(self, samples) -> Dataset:
         if self.convert_dtype:
             samples = samples.map(
-                self._convert_dtype,
+                lambda x: {
+                    **x,
+                    self.column_name: self.convert_dtype(x[self.column_name]),
+                },
                 num_proc=self.num_procs,
             )
 
         return samples.filter(
             lambda x: self.operation(x[self.column_name], self.value),
-            num_proc=self.num_procs,
+            num_proc=self.ctx.num_procs,
         )

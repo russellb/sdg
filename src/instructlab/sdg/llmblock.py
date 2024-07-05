@@ -35,32 +35,29 @@ class LLMBlock(Block):
     # pylint: disable=too-many-instance-attributes
     def __init__(
         self,
+        ctx,
         block_name,
         config_path,
-        client,
-        model_id,
-        model_family,
         output_cols,
         parser_kwargs={},
         **batch_kwargs,
     ) -> None:
-        super().__init__(block_name)
+        super().__init__(ctx, block_name)
         self.block_config = self._load_config(config_path)
         self.prompt_struct = (
             """{system}\n{introduction}\n{principles}\n{examples}\n{generation}"""
         )
         self.prompt_template = self.prompt_struct.format(**self.block_config)
-        self.client = client
-        self.model = model_id
-        self.model_family = model_family
-        self.model_prompt = _get_model_prompt(self.model_family)
+        self.model_prompt = _get_model_prompt(self.ctx.model_family)
         self.output_cols = output_cols
         self.batch_params = batch_kwargs.get("batch_kwargs", {})
+        self.batch_params["batched"] = self.ctx.batched
+        self.batch_params["num_procs"] = self.ctx.num_procs
         self.parser_name = parser_kwargs.get("parser_name", None)
         self.parsing_pattern = parser_kwargs.get("parsing_pattern", None)
         self.parser_cleanup_tags = parser_kwargs.get("parser_cleanup_tags", None)
         self.defaults = {
-            "model": self.model,
+            "model": self.ctx.model_id,
             "temperature": 0,
             "max_tokens": 12000,
         }
@@ -109,7 +106,7 @@ class LLMBlock(Block):
             )
             for sample in samples
         ]
-        response = self.client.completions.create(
+        response = self.ctx.client.completions.create(
             prompt=prompts, **{**self.defaults, **gen_kwargs}
         )
         return [choice.text.strip() for choice in response.choices]
@@ -155,24 +152,20 @@ class LLMBlock(Block):
 class ConditionalLLMBlock(LLMBlock):
     def __init__(
         self,
+        ctx,
         block_name,
         config_paths,
-        client,
-        model_id,
         output_cols,
         selector_column_name,
         parser_kwargs={},
-        model_prompt="{prompt}",
         **batch_kwargs,
     ) -> None:
         super().__init__(
+            ctx,
             block_name,
             config_paths[0][0],
-            client,
-            model_id,
             output_cols,
             parser_kwargs=parser_kwargs,
-            model_prompt=model_prompt,
             **batch_kwargs,
         )
         self.selector_column_name = selector_column_name
@@ -202,7 +195,7 @@ class ConditionalLLMBlock(LLMBlock):
                 )
                 for sample in samples
             ]
-        response = self.client.completions.create(
+        response = self.ctx.client.completions.create(
             prompt=prompts, **{**self.defaults, **gen_kwargs}
         )
         return [choice.text.strip() for choice in response.choices]

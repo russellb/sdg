@@ -19,7 +19,6 @@ import openai
 # pylint: disable=ungrouped-imports
 from instructlab.sdg import SDG, utils
 from instructlab.sdg.default_flows import (
-    FlowParams,
     MMLUBenchFlow,
     SimpleFreeformSkillFlow,
     SimpleGroundedSkillFlow,
@@ -29,7 +28,7 @@ from instructlab.sdg.default_flows import (
     SynthSkillsFlow,
 )
 from instructlab.sdg.llmblock import MODEL_FAMILY_MERLINITE, MODEL_FAMILY_MIXTRAL
-from instructlab.sdg.pipeline import Pipeline
+from instructlab.sdg.pipeline import Pipeline, PipelineContext
 from instructlab.sdg.utils import models
 from instructlab.sdg.utils.taxonomy import (
     leaf_node_to_samples,
@@ -124,7 +123,7 @@ def _gen_test_data(
             outfile.write("\n")
 
 
-def _sdg_init(pipeline, client, model_family, model_name, num_iters, batched):
+def _sdg_init(pipeline, client, model_family, model_id, num_iters, batched):
     knowledge_flow_types = []
     freeform_skill_flow_types = []
     grounded_skill_flow_types = []
@@ -140,13 +139,17 @@ def _sdg_init(pipeline, client, model_family, model_name, num_iters, batched):
     else:
         raise utils.GenerateException(f"Error: pipeline ({pipeline}) is not supported.")
 
-    flow_params = FlowParams(client, model_family, model_name, num_iters, batched)
+    ctx = PipelineContext(client, model_family, model_id, num_iters, batched)
 
-    knowledge_pipeline = Pipeline.from_flows(knowledge_flow_types, flow_params)
-    freeform_skill_pipeline = Pipeline.from_flows(freeform_skill_flow_types, flow_params)
-    grounded_skill_pipeline = Pipeline.from_flows(grounded_skill_flow_types, flow_params)
+    knowledge_pipeline = Pipeline.from_flows(ctx, knowledge_flow_types)
+    freeform_skill_pipeline = Pipeline.from_flows(ctx, freeform_skill_flow_types)
+    grounded_skill_pipeline = Pipeline.from_flows(ctx, grounded_skill_flow_types)
 
-    return SDG([knowledge_pipeline]), SDG([freeform_skill_pipeline]), SDG([grounded_skill_pipeline])
+    return (
+        SDG([knowledge_pipeline]),
+        SDG([freeform_skill_pipeline]),
+        SDG([grounded_skill_pipeline]),
+    )
 
 
 # TODO - parameter removal needs to be done in sync with a CLI change.
