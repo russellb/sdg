@@ -11,7 +11,7 @@ logger = setup_logger(__name__)
 class IterBlock(Block):
     def __init__(self, ctx, block_name, block_type, block_kwargs, **kwargs):
         super().__init__(ctx, block_name)
-        self.block = block_type(**block_kwargs)
+        self.block = block_type(ctx, **block_kwargs)
         self.gen_kwargs = kwargs.get("gen_kwargs", {})
         self.gen_kwargs = kwargs.get("gen_kwargs", {})
 

@@ -99,6 +99,14 @@ class LLMBlock(Block):
 
         return matches
 
+    def _gen_kwargs(self, **gen_kwargs):
+        gen_kwargs = {**self.defaults, **gen_kwargs}
+        if "max_tokens" in gen_kwargs:
+            gen_kwargs["max_tokens"] = int(gen_kwargs["max_tokens"])
+        if "temperature" in gen_kwargs:
+            gen_kwargs["temperature"] = float(gen_kwargs["temperature"])
+        return gen_kwargs
+
     def _generate(self, samples, **gen_kwargs) -> list:
         prompts = [
             self.model_prompt.format(
@@ -107,7 +115,8 @@ class LLMBlock(Block):
             for sample in samples
         ]
         response = self.ctx.client.completions.create(
-            prompt=prompts, **{**self.defaults, **gen_kwargs}
+            prompt=prompts,
+            **self._gen_kwargs(**gen_kwargs),
         )
         return [choice.text.strip() for choice in response.choices]
 
@@ -196,7 +205,8 @@ class ConditionalLLMBlock(LLMBlock):
                 for sample in samples
             ]
         response = self.ctx.client.completions.create(
-            prompt=prompts, **{**self.defaults, **gen_kwargs}
+            prompt=prompts,
+            **self._gen_kwargs(**gen_kwargs),
         )
         return [choice.text.strip() for choice in response.choices]
 

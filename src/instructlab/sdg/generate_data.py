@@ -18,17 +18,18 @@ import openai
 # First Party
 # pylint: disable=ungrouped-imports
 from instructlab.sdg import SDG, utils
-from instructlab.sdg.default_flows import (
-    MMLUBenchFlow,
-    SimpleFreeformSkillFlow,
-    SimpleGroundedSkillFlow,
-    SimpleKnowledgeFlow,
-    SynthGroundedSkillsFlow,
-    SynthKnowledgeFlow,
-    SynthSkillsFlow,
-)
 from instructlab.sdg.llmblock import MODEL_FAMILY_MERLINITE, MODEL_FAMILY_MIXTRAL
-from instructlab.sdg.pipeline import Pipeline, PipelineContext
+from instructlab.sdg.pipeline import (
+    MMLU_BENCH_FLOW,
+    SIMPLE_FREEFORM_SKILLS_FLOW,
+    SIMPLE_GROUNDED_SKILLS_FLOW,
+    SIMPLE_KNOWLEDGE_FLOW,
+    SYNTH_FREEFORM_SKILLS_FLOW,
+    SYNTH_GROUNDED_SKILLS_FLOW,
+    SYNTH_KNOWLEDGE_FLOW,
+    Pipeline,
+    PipelineContext,
+)
 from instructlab.sdg.utils import models
 from instructlab.sdg.utils.taxonomy import (
     leaf_node_to_samples,
@@ -124,31 +125,27 @@ def _gen_test_data(
 
 
 def _sdg_init(pipeline, client, model_family, model_id, num_iters, batched):
-    knowledge_flow_types = []
-    freeform_skill_flow_types = []
-    grounded_skill_flow_types = []
+    knowledge_flows = []
+    freeform_skill_flows = []
+    grounded_skill_flows = []
     if pipeline == "full":
-        knowledge_flow_types.append(MMLUBenchFlow)
-        knowledge_flow_types.append(SynthKnowledgeFlow)
-        freeform_skill_flow_types.append(SynthSkillsFlow)
-        grounded_skill_flow_types.append(SynthGroundedSkillsFlow)
+        knowledge_flows.append(MMLU_BENCH_FLOW)
+        knowledge_flows.append(SYNTH_KNOWLEDGE_FLOW)
+        freeform_skill_flows.append(SYNTH_FREEFORM_SKILLS_FLOW)
+        grounded_skill_flows.append(SYNTH_GROUNDED_SKILLS_FLOW)
     elif pipeline == "simple":
-        knowledge_flow_types.append(SimpleKnowledgeFlow)
-        freeform_skill_flow_types.append(SimpleFreeformSkillFlow)
-        grounded_skill_flow_types.append(SimpleGroundedSkillFlow)
+        knowledge_flows.append(SIMPLE_KNOWLEDGE_FLOW)
+        freeform_skill_flows.append(SIMPLE_FREEFORM_SKILLS_FLOW)
+        grounded_skill_flows.append(SIMPLE_GROUNDED_SKILLS_FLOW)
     else:
         raise utils.GenerateException(f"Error: pipeline ({pipeline}) is not supported.")
 
     ctx = PipelineContext(client, model_family, model_id, num_iters, batched)
 
-    knowledge_pipeline = Pipeline.from_flows(ctx, knowledge_flow_types)
-    freeform_skill_pipeline = Pipeline.from_flows(ctx, freeform_skill_flow_types)
-    grounded_skill_pipeline = Pipeline.from_flows(ctx, grounded_skill_flow_types)
-
     return (
-        SDG([knowledge_pipeline]),
-        SDG([freeform_skill_pipeline]),
-        SDG([grounded_skill_pipeline]),
+        SDG([Pipeline.from_flows(ctx, knowledge_flows)]),
+        SDG([Pipeline.from_flows(ctx, freeform_skill_flows)]),
+        SDG([Pipeline.from_flows(ctx, grounded_skill_flows)]),
     )
 
 

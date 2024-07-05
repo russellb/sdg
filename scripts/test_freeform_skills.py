@@ -3,9 +3,7 @@ from datasets import Dataset
 from openai import OpenAI
 
 # First Party
-from src.instructlab.sdg import SDG
-from src.instructlab.sdg.default_flows import SynthSkillsFlow
-from src.instructlab.sdg.pipeline import Pipeline, PipelineContext
+from src.instructlab.sdg import SDG, pipeline
 
 # for vLLM endpoints, the api_key remains "EMPTY"
 openai_api_key = "EMPTY"
@@ -49,10 +47,9 @@ Sincerely,
 
 ds = Dataset.from_list(samples)
 
-ctx = PipelineContext(client, "mixtral", teacher_model, 1)
+ctx = pipeline.PipelineContext(client, "mixtral", teacher_model, 1)
 
-skills_block_configs = SynthSkillsFlow().render()
-skills_pipe = Pipeline(ctx, skills_block_configs)
+skills_pipe = pipeline.Pipeline(ctx, [pipeline.SYNTH_SKILLS_FLOW])
 
 sdg = SDG([skills_pipe])
 gen_data = sdg.generate(ds)
