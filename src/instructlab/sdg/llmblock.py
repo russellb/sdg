@@ -12,6 +12,23 @@ from .logger_config import setup_logger
 
 logger = setup_logger(__name__)
 
+MODEL_FAMILY_MIXTRAL = "mixtral"
+MODEL_FAMILY_MERLINITE = "merlinite"
+
+_MODEL_PROMPT_MIXTRAL = "<s> [INST] {prompt} [/INST]"
+_MODEL_PROMPT_MERLINITE = "'<|system|>\nYou are an AI language model developed by IBM Research. You are a cautious assistant. You carefully follow instructions. You are helpful and harmless and you follow ethical guidelines and promote positive behavior.\n<|user|>\n{prompt}\n<|assistant|>\n'"
+
+_MODEL_PROMPTS = {
+    MODEL_FAMILY_MIXTRAL: _MODEL_PROMPT_MIXTRAL,
+    MODEL_FAMILY_MERLINITE: _MODEL_PROMPT_MERLINITE,
+}
+
+
+def _get_model_prompt(model_family):
+    if model_family not in _MODEL_PROMPTS:
+        raise ValueError(f"Unknown model family: {model_family}")
+    return _MODEL_PROMPTS[model_family]
+
 
 # pylint: disable=dangerous-default-value
 class LLMBlock(Block):
@@ -22,9 +39,9 @@ class LLMBlock(Block):
         config_path,
         client,
         model_id,
+        model_family,
         output_cols,
         parser_kwargs={},
-        model_prompt="{prompt}",
         **batch_kwargs,
     ) -> None:
         super().__init__(block_name)
@@ -35,7 +52,8 @@ class LLMBlock(Block):
         self.prompt_template = self.prompt_struct.format(**self.block_config)
         self.client = client
         self.model = model_id
-        self.model_prompt = model_prompt
+        self.model_family = model_family
+        self.model_prompt = _get_model_prompt(self.model_family)
         self.output_cols = output_cols
         self.batch_params = batch_kwargs.get("batch_kwargs", {})
         self.parser_name = parser_kwargs.get("parser_name", None)

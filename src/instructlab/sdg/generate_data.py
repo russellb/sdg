@@ -19,8 +19,6 @@ import openai
 # pylint: disable=ungrouped-imports
 from instructlab.sdg import SDG, utils
 from instructlab.sdg.default_flows import (
-    MODEL_FAMILY_MERLINITE,
-    MODEL_FAMILY_MIXTRAL,
     MMLUBenchFlow,
     SimpleFreeformSkillFlow,
     SimpleGroundedSkillFlow,
@@ -29,6 +27,7 @@ from instructlab.sdg.default_flows import (
     SynthKnowledgeFlow,
     SynthSkillsFlow,
 )
+from instructlab.sdg.llmblock import MODEL_FAMILY_MERLINITE, MODEL_FAMILY_MIXTRAL
 from instructlab.sdg.pipeline import Pipeline
 from instructlab.sdg.utils import models
 from instructlab.sdg.utils.taxonomy import (
